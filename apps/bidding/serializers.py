@@ -24,7 +24,7 @@ class Bidserializers(serializers.ModelSerializer):
     # item_id = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all()) # Mặc định
 
     # Các field khác giữ nguyên hoặc tùy chỉnh format
-    bid_amount = serializers.DecimalField(max_digits=10, decimal_places=2, coerce_to_string=True)
+    bid_amount = serializers.DecimalField(max_digits=25, decimal_places=0, coerce_to_string=True)
     bid_time = serializers.DateTimeField(read_only=True) # Format lại nếu muốn
 
     class Meta:
