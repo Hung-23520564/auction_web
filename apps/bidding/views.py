@@ -39,7 +39,7 @@ def get_item_details_for_socket(item_obj):
     return {
         'item_id': item_obj.pk,
         'name': item_obj.name,
-        'image_url': item_obj.image_url.url if item_obj.image_url else '/static/images/placeholder_item_large.png', # Ví dụ
+        'image_url': item_obj.image_url if item_obj.image_url else '/static/images/placeholder_item_large.png', # Ví dụ
         'seller': {'email': item_obj.seller.email} if item_obj.seller else {'email': 'Người bán ẩn danh'}, # Ví dụ
         'current_price': str(item_obj.current_price), # Đảm bảo là string
         'starting_price': str(item_obj.starting_price), # Đảm bảo là string
