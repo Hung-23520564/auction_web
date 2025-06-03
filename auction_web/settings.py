@@ -39,7 +39,17 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'fallback_secret_key_if_not_in_env_but_plea
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # --- ALLOWED_HOSTS ---
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'auctionhub.uk', 'www.auctionhub.uk', '*.vercel.app']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'auctionhub.uk', 'www.auctionhub.uk', '3.0.145.232']
+
+# Thêm AWS hosts nếu có
+AWS_HOST = os.getenv('AWS_HOST')
+if AWS_HOST:
+    ALLOWED_HOSTS.append(AWS_HOST)
+
+# Thêm các subdomain AWS nếu cần
+AWS_ALB_HOST = os.getenv('AWS_ALB_HOST')  # Application Load Balancer
+if AWS_ALB_HOST:
+    ALLOWED_HOSTS.append(AWS_ALB_HOST)
 
 PRODUCTION_HOST = ['auctionhub.uk', 'www.auctionhub.uk']
 
@@ -138,11 +148,20 @@ DATABASES = {
 # Ghi đè bằng DATABASE_URL nếu nó tồn tại (cho Vercel và có thể cả local)
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.config(
+    db_config = dj_database_url.config(
         default=DATABASE_URL,
         conn_max_age=600, # Thời gian kết nối được giữ (giây)
         conn_health_checks=True, # Kiểm tra sức khỏe kết nối
     )
+    
+    # AWS RDS thường yêu cầu SSL
+    if not DEBUG and 'rds.amazonaws.com' in DATABASE_URL:
+        db_config['OPTIONS'] = {
+            'sslmode': 'require',
+        }
+        print("Enabling SSL for AWS RDS connection")
+    
+    DATABASES['default'] = db_config
 
 
 CHANNEL_LAYERS = {
@@ -150,6 +169,31 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer", # OK cho development và Vercel (serverless)
     },
 }
+
+# Production Channel Layer với Redis (cho AWS)
+USE_REDIS_CHANNELS = os.getenv('USE_REDIS_CHANNELS', 'False').lower() == 'true'
+REDIS_URL = os.getenv('REDIS_URL')
+
+if USE_REDIS_CHANNELS and REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+                "capacity": 1500,  # Maximum number of messages to store
+                "expiry": 60,      # How long to keep messages (seconds)
+            },
+        },
+    }
+    print("Using Redis Channel Layer for production")
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
+    if not DEBUG:
+        print("WARNING: Using InMemoryChannelLayer in production. Consider using Redis.")
 
 
 # Password validation
@@ -183,10 +227,29 @@ STATICFILES_DIRS = [
 ]
 
 # Thư mục để collect static files cho production
-STATIC_ROOT = BASE_DIR / "staticfiles_build" / "static"
+# Sử dụng path phù hợp với AWS
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Storage backend cho static files
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# AWS S3 Static Files Configuration (uncomment nếu dùng S3)
+USE_S3_FOR_STATIC = os.getenv('USE_S3_FOR_STATIC', 'False').lower() == 'true'
+
+if USE_S3_FOR_STATIC:
+    # AWS S3 settings
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
+    AWS_DEFAULT_ACL = None
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+    
+    # Static files S3 settings
+    AWS_LOCATION = 'static'
+    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+else:
+    # Use WhiteNoise for serving static files (good for EC2/ECS)
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # Default primary key field type
@@ -307,3 +370,62 @@ cloudinary.config(
     api_key=CLOUDINARY_API_KEY,
     api_secret=CLOUDINARY_API_SECRET,
 )
+
+# --- CORS Configuration ---
+# Quan trọng cho WebSocket và API calls từ frontend
+
+# Development CORS settings
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+else:
+    # Production CORS settings - Support both HTTP and HTTPS for AWS
+    CORS_ALLOWED_ORIGINS = [
+        "https://auctionhub.uk",
+        "https://www.auctionhub.uk",
+        "http://3.0.145.232:8000",
+        "http://ec2-3-0-145-232.ap-southeast-1.compute.amazonaws.com:8000",
+    ]
+    
+    # Thêm AWS origins nếu có
+    if AWS_HOST:
+        CORS_ALLOWED_ORIGINS.append(f"http://{AWS_HOST}:8000")
+        CORS_ALLOWED_ORIGINS.append(f"https://{AWS_HOST}")
+    if AWS_ALB_HOST:
+        CORS_ALLOWED_ORIGINS.append(f"http://{AWS_ALB_HOST}:8000")
+        CORS_ALLOWED_ORIGINS.append(f"https://{AWS_ALB_HOST}")
+        
+    CORS_ALLOW_CREDENTIALS = True
+
+# Headers cần thiết cho WebSocket
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'sec-websocket-extensions',
+    'sec-websocket-key',
+    'sec-websocket-protocol',
+    'sec-websocket-version',
+    'upgrade',
+    'connection',
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://auctionhub.uk",
+    "https://www.auctionhub.uk",
+    "http://3.0.145.232:8000",
+    "http://ec2-3-0-145-232.ap-southeast-1.compute.amazonaws.com:8000",
+]
+
+if AWS_HOST:
+    CSRF_TRUSTED_ORIGINS.append(f"http://{AWS_HOST}:8000")
+    CSRF_TRUSTED_ORIGINS.append(f"https://{AWS_HOST}")
+if AWS_ALB_HOST:
+    CSRF_TRUSTED_ORIGINS.append(f"http://{AWS_ALB_HOST}:8000")
+    CSRF_TRUSTED_ORIGINS.append(f"https://{AWS_ALB_HOST}")
