@@ -49,7 +49,7 @@ The Real-Time Auction Website is a platform for fair and fast product bidding in
 
 - **Live Website**: <a href="https://www.auctionhub.uk/" target="_blank">auctionhub.uk</a>
 
-- **Interview Video**: <a href="" target="_blank">Video</a>
+- **Interview Video**: <a href="https://www.tiktok.com/@74hungnguyen/video/7511605716692634888?_r=1&_t=ZS-8xPObKA3hCs" target="_blank">Video</a>
 
 ## License
 
