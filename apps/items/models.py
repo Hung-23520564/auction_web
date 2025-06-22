@@ -1,5 +1,7 @@
 from django.db import models
+from decimal import Decimal
 from django.conf import settings
+
 
 class Item(models.Model):
     item_id = models.AutoField(primary_key=True)
@@ -14,6 +16,13 @@ class Item(models.Model):
         max_length=10,
         choices=[('ongoing', 'Ongoing'), ('completed', 'Completed'), ('canceled', 'Canceled')],
         default='ongoing'
+    )
+    current_highest_bid = models.ForeignKey(
+        'bidding.Bid', 
+        related_name='winning_item', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
     )
 
     class Meta:

@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 import uuid # Có thể dùng cho ID nếu muốn
+from apps.items.models import Item
+from apps.bidding.models import Escrow
 
 class WalletTransaction(models.Model):
 
@@ -47,6 +49,10 @@ class WalletTransaction(models.Model):
     description = models.TextField(blank=True, null=True, help_text="Mô tả giao dịch, ví dụ: mã giao dịch nội bộ, lý do...")
     gateway_transaction_id = models.CharField(max_length=255, blank=True, null=True, db_index=True, help_text="ID giao dịch từ cổng thanh toán bên ngoài (nếu có)")
     # related_order_id = models.PositiveIntegerField(null=True, blank=True, help_text="ID của đơn hàng/phiên đấu giá liên quan (nếu có)")
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, null=True, blank=True, related_name='wallet_transactions')
+    seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='sale_transactions')
+    escrow = models.OneToOneField(Escrow, on_delete=models.PROTECT, null=True, blank=True, related_name='sale_transaction')
+    payment_due_date = models.DateTimeField(null=True, blank=True, help_text="Hạn chót thanh toán")
 
 
     def __str__(self):

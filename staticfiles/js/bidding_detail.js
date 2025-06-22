@@ -59,20 +59,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAPI(url, options = {}) {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMessage = errorData.error || errorData.detail || `HTTP error! status: ${response.status}`;
-                throw new Error(errorMessage);
-            }
-            return response.json();
+    try {
+        const response = await fetch(url, options);
+        const data = await response.json(); // Luôn parse JSON trước
+        if (!response.ok) {
+            // Ném đi toàn bộ object JSON data mà server trả về
+            // để các hàm khác có thể truy cập đầy đủ thông tin như error_code
+            throw data; 
+        }
+        return data; // Nếu thành công, trả về data
         } catch (error) {
-            console.error('Fetch API error:', error);
+            // Ném lỗi đi tiếp để hàm handlePlaceBid có thể bắt và xử lý
             throw error;
         }
     }
-
     function lamTronTien(amount) {
         const num = Number(amount);
         if (isNaN(num)) return 0;
@@ -236,36 +236,56 @@ document.addEventListener('DOMContentLoaded', () => {
     function startCountdown(endTimeString) {
         clearInterval(countdownInterval);
         const endTime = new Date(endTimeString).getTime();
+        let hasTriggeredEndAuction = false;
 
         function updateCountdown() {
             const now = new Date().getTime();
             const distance = endTime - now;
             const isAuctionEnded = distance < 0;
 
-            if (isAuctionEnded) {
+            if (isAuctionEnded && !hasTriggeredEndAuction) {
+                hasTriggeredEndAuction = true;
+                
                 clearInterval(countdownInterval);
+                
+                // THAY ĐỔI THEO YÊU CẦU: Cập nhật UI ngay lập tức
                 if (endTimeElement) endTimeElement.textContent = "Đã kết thúc!";
-                // Không gọi showBidMessage ở đây nữa, để WebSocket xử lý thông báo cuối cùng
                 disableBidForm(true, "Đã kết thúc");
+
+                console.log(`Timer ended for item ${currentItemId}. Calling end-auction API.`);
+
+                // Vẫn gọi API để xử lý hoàn tiền ở backend
+                fetchAPI('/api/bidding/process-auction-end/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ item_id: currentItemId })
+                })
+                .then(data => {
+                    console.log("End-auction API response:", data);
+                })
+                .catch(error => {
+                    console.error("Error calling end-auction API:", error);
+                });
+            } else if (isAuctionEnded) {
+                // Đã hết giờ và đã gọi API rồi -> không làm gì cả.
             } else {
+                // Hiển thị thời gian còn lại
                 if (endTimeElement) {
                     const days = Math.floor(distance / (1000 * 60 * 60 * 24));
                     const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-                    endTimeElement.textContent =
-                        `${days > 0 ? days + " ngày " : ""}` +
-                        `${hours.toString().padStart(2, '0')}:` +
-                        `${minutes.toString().padStart(2, '0')}:` +
-                        `${seconds.toString().padStart(2, '0')}`;
+                    endTimeElement.textContent = `${days > 0 ? days + " ngày " : ""}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 }
-                 // Kích hoạt lại form nếu chưa đăng nhập thì vẫn bị disable
-                disableBidForm(!isUserClientSideLoggedIn, isUserClientSideLoggedIn ? "Đặt giá" : "Đăng nhập để đặt giá");
             }
         }
         updateCountdown();
         countdownInterval = setInterval(updateCountdown, 1000);
     }
+    
 
     function updateTotalValue() {
         if (!totalValueSpan || !bidAmountInput) return;
@@ -316,74 +336,75 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handlePlaceBid(event) {
-        event.preventDefault();
-        showBidMessage('');
+    event.preventDefault();
+    showBidMessage(''); // Xóa thông báo cũ
 
-        if (!isUserClientSideLoggedIn) {
-            showBidMessage('Vui lòng đăng nhập để đặt giá.', true);
-            return;
-        }
-        if (!currentItemId) {
-            showBidMessage('Lỗi: Không tìm thấy ID sản phẩm.', true);
-            return;
-        }
-
-        const rawBidAmountString = cleanNumberString(bidAmountInput.value);
-        const bidAmount = parseFloat(rawBidAmountString);
-        const minAllowedBid = parseFloat(bidAmountInput.min);
-
-        if (isNaN(bidAmount) || bidAmount <= 0) {
-            showBidMessage('Số tiền đặt giá không hợp lệ. Vui lòng nhập số dương.', true);
-            return;
-        }
-        if (bidAmount < minAllowedBid) {
-            showBidMessage(`Giá đặt phải lớn hơn hoặc bằng ${formatPriceVN(minAllowedBid, false)}.`, true);
-            return;
-        }
-        const maxAllowedBidText = maxBidDisplay ? cleanNumberString(maxBidDisplay.textContent) : null;
-        const maxAllowedBid = maxAllowedBidText ? parseFloat(maxAllowedBidText) : Infinity;
-        if (bidAmount > maxAllowedBid) {
-            showBidMessage(`Giá đặt không được vượt quá giá tối đa ${formatPriceVN(maxAllowedBid, false)}.`, true);
-            return;
-        }
-
-        disableBidForm(true, "Đang gửi...");
-        showBidMessage('Đang xử lý đặt giá...', false);
-
-        try {
-            const responseData = await fetchAPI('/api/bidding/place_bid/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
-                },
-                body: JSON.stringify({
-                    item_id: currentItemId,
-                    bid_amount: bidAmount
-                })
-            });
-            // Thông báo thành công từ HTTP POST (vẫn giữ để người đặt giá biết ngay)
-            showBidMessage(`Yêu cầu đặt giá của bạn đã được gửi thành công.`, false);
-            // Không cần gọi loadItemDetails() và loadBidHistory() nữa, WebSocket sẽ xử lý.
-            // Giá trị input sẽ được cập nhật khi WebSocket message đến và updateBidRanges được gọi.
-
-        } catch (error) {
-            console.error('Lỗi khi đặt giá:', error);
-            showBidMessage(error.message || 'Đã xảy ra lỗi khi đặt giá. Vui lòng thử lại.', true);
-        } finally {
-            // Kích hoạt lại form nếu phiên đấu giá chưa kết thúc và người dùng đăng nhập
-            const endTime = new Date(endTimeElement.dataset.endTime).getTime(); // Giả sử bạn lưu endTime vào data-attribute
-            const isAuctionStillActive = endTimeElement.textContent !== "Đã kết thúc!" && (endTime ? new Date().getTime() < endTime : true);
-
-            if (isAuctionStillActive && isUserClientSideLoggedIn) {
-                 disableBidForm(false);
-            } else if (!isAuctionStillActive) {
-                 disableBidForm(true, "Đã kết thúc");
-            } else { // Chưa đăng nhập
-                 disableBidForm(true, "Đăng nhập để đặt giá");
-            }
-        }
+    if (!isUserClientSideLoggedIn) {
+        showBidMessage('Vui lòng đăng nhập để đặt giá.', true);
+        return;
     }
+    if (!currentItemId) {
+        showBidMessage('Lỗi: Không tìm thấy ID sản phẩm.', true);
+        return;
+    }
+
+    const bidAmount = parseFloat(String(bidAmountInput.value).replace(/[^0-9]/g, ''));
+    if (isNaN(bidAmount) || bidAmount <= 0) {
+        showBidMessage('Số tiền đặt giá không hợp lệ.', true);
+        return;
+    }
+    
+    disableBidForm(true, "Đang gửi...");
+    showBidMessage('Đang xử lý đặt giá...', false);
+
+    try {
+        const data = await fetchAPI('/api/bidding/place_bid/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({ item_id: currentItemId, bid_amount: bidAmount })
+        });
+        
+        // Nếu thành công ngay (cho các lần đặt giá sau)
+        showBidMessage('Đặt giá thành công!', false);
+
+    } catch (error) {
+        console.error('Lỗi khi đặt giá:', error);
+
+        if (error && error.error_code === 'DEPOSIT_REQUIRED') {
+            // XỬ LÝ TÍN HIỆU YÊU CẦU ĐẶT CỌC
+            if (confirm(error.message)) { // Hiển thị hộp thoại OK/Cancel
+                // Nếu người dùng nhấn OK, gửi lại yêu cầu với cờ xác nhận
+                showBidMessage('Đang xác nhận cọc và đặt giá...', false);
+                try {
+                    const finalData = await fetchAPI('/api/bidding/place_bid/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                        body: JSON.stringify({
+                            item_id: currentItemId,
+                            bid_amount: bidAmount,
+                            deposit_confirmed: true // Gửi cờ xác nhận
+                        })
+                    });
+                    showBidMessage('Đặt cọc và đặt giá thành công!', false);
+                } catch (finalError) {
+                    showBidMessage(finalError.error || 'Lỗi khi xác nhận đặt cọc.', true);
+                }
+            } else {
+                // Nếu người dùng nhấn Cancel
+                showBidMessage('Bạn đã hủy thao tác đặt giá.', true);
+            }
+        } else if (error && error.error_code === 'INSUFFICIENT_FUNDS') {
+            // Xử lý lỗi không đủ tiền
+            showBidMessage(error.error || error.message, true);
+        } else {
+            // Các lỗi chung khác
+            showBidMessage(error.error || 'Đã xảy ra lỗi khi đặt giá. Vui lòng thử lại.', true);
+        }
+    } finally {
+        // Kích hoạt lại form để người dùng có thể tiếp tục
+        disableBidForm(false);
+    }
+}
 
     async function loadItemDetails() {
         if (!currentItemId) {

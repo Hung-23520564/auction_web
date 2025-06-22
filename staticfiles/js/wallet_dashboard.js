@@ -160,21 +160,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const soTienCanNap = paramsUrl.get('soTienCanNap');
         const maGiaoDichGoc = paramsUrl.get('maGiaoDichGoc');
 
-        if (mucDich === 'thanhToanSanPham' && soTienCanNap) {
+        // =======================================================
+        // SỬA LẠI ĐIỀU KIỆN IF Ở ĐÂY
+        // =======================================================
+        // Chấp nhận cả mục đích 'thanhToanSanPham' hoặc 'datGia'
+        if ((mucDich === 'thanhToanSanPham' || mucDich === 'datGia') && soTienCanNap) {
+            
+            // Hiển thị form nạp tiền và reset các giá trị cũ
             hienThiFormNapTienVaReset();
 
             if (inputSoTienNap) {
-                // Dinh dang so tien nap (VD: 200000 thay vi 200,000)
+                // Điền số tiền cần nạp vào ô input
                 inputSoTienNap.value = parseFloat(soTienCanNap.replace(/,/g, '')); 
             }
 
-            // Goi ham tao QR sau khi input da duoc set gia tri
-            // Su dung setTimeout de dam bao DOM co thoi gian cap nhat gia tri input
+            // Dùng setTimeout để đảm bảo DOM có thời gian cập nhật giá trị input
+            // trước khi tự động nhấn nút tạo QR
             setTimeout(async () => {
                 const soTienDaDien = inputSoTienNap ? inputSoTienNap.value : "0";
+                // Tự động tạo mã QR
                 await guiYeuCauTaoMaQR(soTienDaDien, maGiaoDichGoc);
             }, 100); 
 
+            // Xóa các tham số trên URL để người dùng không bị tạo lại QR khi tải lại trang
             if (history.replaceState) {
                 const urlSach = window.location.pathname;
                 history.replaceState({ path: urlSach }, '', urlSach);
