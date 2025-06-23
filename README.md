@@ -15,7 +15,6 @@ Team Members:
 - [Description](#description)
 - [Technology Stack](#technology-stack)
 - [Features](#features)
-- [Architecture](#architecture)
 - [Installation](#installation)
 - [Environment Variables](#environment-variables)
 - [API Documentation](#api-documentation)
@@ -93,51 +92,6 @@ The Real-Time Auction Website is a comprehensive platform for fair and fast prod
 - **Enhanced Security** - HTTPS, CSRF, XSS, and SQL Injection protection via Django & Cloudflare
 - **Performance Monitoring** - Built-in logging and tracking
 
-## 🏗 Architecture
-
-### Production Deployment Architecture
-```
-              +----------------------------------+
-              |              Users               |
-              +-----------------+----------------+
-                                | (HTTPS)
-              +-----------------v----------------+
-              |           Cloudflare             |
-              | (DNS, CDN, SSL, DDoS Protection) |
-              +-----------------+----------------+
-                                | (HTTPS)
-+-------------------------------v-------------------------------+
-|                   AWS EC2 Instance (Ubuntu)                   |
-|                                                               |
-|  +---------------------------+                                |
-|  |           Nginx           |                                |
-|  | (Reverse Proxy, Port 443) |                                |
-|  +-------------+-------------+                                |
-|                |                                              |
-|  +-------------+-------------+                                |
-|  |                           | (WebSocket /ws/**)             |
-|  |  (HTTP /)                 |                                |
-|  |                           |                                |
-|  +-------------v--v--+           +------------v-----------+   |
-|  |     Gunicorn      |           |          Daphne        |   |
-|  | (WSGI App Server) |           |  (ASGI App Server)     |   |
-|  +---------+---------+           +----------+-------------+   |
-|            |                                |                 |
-|            +----------------+---------------+                 |
-|                             |                                 |
-|                      +------v------+                          |
-|                      |   Django    |                          |
-|                      | Application |                          |
-|                      +--+-------+--+                          |
-|                         |       |                             |
-+-------------------------+       +-----> AWS RDS (PostgreSQL)  |
-                                  |                             |
-                                  +-----> Redis (Channel Layer) | 
-                                  |                             |
-                                  +-----> Cloudinary (Media)    |
-                                                                |
-+---------------------------------------------------------------+
-```
 
 ### Application Structure
 ```
@@ -240,42 +194,95 @@ REDIS_URL=redis://127.0.0.1:6379/1
 
 ## 📡 API Documentation
 
-### Authentication Endpoints
+### Core API Endpoints
 ```
-POST /api/auth/login/          # User login
-POST /api/auth/register/       # User registration
-POST /api/auth/logout/         # User logout
-GET  /api/users/profile/       # Get user profile
-PUT  /api/users/profile/       # Update user profile
-```
+# Authentication
+POST /api/auth/login/                      # User login
+POST /api/auth/register/                   # User registration
+POST /api/auth/logout/                     # User logout
+GET  /api/users/profile/                   # Get user profile
+PUT  /api/users/profile/                   # Update user profile
 
-### Auction Endpoints
-```
-GET  /api/items/               # List all auction items
-GET  /api/items/{id}/          # Get auction details
+# Items Management
+GET  /api/items/                           # List all items
+POST /api/items/create/                    # Create new item
+GET  /api/items/{id}/                      # Get item details
+PUT  /api/items/{id}/                      # Update item
+GET  /api/items/search/                    # Advanced item search
+
+# Real-time Bidding
+POST /api/bidding/place-bid/               # Place a bid
+GET  /api/bidding/my-bids/                 # Get user's bids
+GET  /api/bidding/item/{id}/bids/          # Get item's bid history
+GET  /api/bidding/my-active-bids/          # Get active bids
+GET  /api/bidding/my-created-items/        # Get created items
+POST /api/bidding/process-ended-auction/   # Process completed auctions
+
+# Wallet & Payments
+GET  /api/wallet/balance/                  # Get wallet balance
+POST /api/wallet/deposit/                  # Deposit money
+GET  /api/wallet/transactions/             # Transaction history
+POST /api/payments/create-transaction/     # Create payment transaction
+POST /api/payments/confirm-deposit/        # Confirm payment deposit
+GET  /api/wallet/qr-generate/              # Generate VietQR code
+POST /api/wallet/admin-confirm/            # Admin confirm transaction
+
+# Reviews
+POST /api/reviews/create/                  # Create review
+GET  /api/reviews/user/{user_id}/          # Get user reviews
+GET  /api/reviews/                         # List all reviews
+
+# Admin Dashboard
+GET  /api/admin/stats/                     # Admin statistics
+GET  /api/admin/users/                     # Manage users
+PUT  /api/admin/items/{id}/approve/        # Approve items
+GET  /api/admin/transactions/              # View all transactions
+PUT  /api/admin/users/{id}/status/         # Update user status
+
+# File Management
+POST /api/users/upload-avatar/             # Upload user avatar
+GET  /api/items/upload-signature/          # Get upload signature
+GET  /api/items/upload-url/                # Get Cloudinary upload URL
+POST /api/sim/upload/                      # Simulation image upload
+
+# Additional Features
+GET  /api/chatbot/message/                 # AI chatbot interaction
+GET  /                                     # Home page
+GET  /about/                               # About page
+GET  /contact/                             # Contact page
+GET  /blog/                                # Blog listing
+GET  /blog/{slug}/                         # Blog post detail
 ```
 
 ### WebSocket Endpoints
 ```
-ws://your-domain/ws/bidding/{item_id}/  # Real-time bidding for an item
-ws://your-domain/ws/home/               # General homepage updates
+ws://your-domain/ws/bidding/{item_id}/     # Real-time bidding
+ws://your-domain/ws/home/                  # Homepage updates
 ```
 
-*(For a full list of APIs, please refer to the project's Postman collection or Swagger documentation.)*
+### Authentication
+Protected endpoints require JWT token:
+```
+Authorization: Bearer <your_jwt_token>
+```
 
 ## 🚀 Deployment
 
 This project is deployed on AWS using a high-performance stack managed by systemd.
 
 ### Production Infrastructure
-- **AWS EC2 (Ubuntu)**: Hosts the Django application.
+- **AWS EC2 (Ubuntu)**: Hosts the Django application and related services.
 - **AWS RDS for PostgreSQL**: Managed, scalable, and reliable database service.
 - **Cloudflare**: Acts as the primary entry point, providing CDN, DDoS protection, and SSL termination.
-- **Nginx**: Serves as a reverse proxy, directing HTTP traffic to Gunicorn, WebSocket traffic to Daphne, and serving static files directly for maximum speed.
-- **Gunicorn**: The WSGI server dedicated to handling synchronous HTTP requests.
-- **Daphne**: The ASGI server dedicated to handling asynchronous WebSocket connections.
-- **Redis**: Serves as the crucial channel layer backend, enabling communication between different server processes.
-- **Systemd**: Manages Gunicorn and Daphne as robust system services, ensuring they are always running.
+- **Nginx**: Central routing component that:
+  - Serves static files (/static/**) directly from disk for optimal performance
+  - Forwards HTTP requests to Gunicorn (port 8001)
+  - Forwards WebSocket requests (/ws/**) to Daphne (port 8000)
+  - Handles SSL termination and security headers
+- **Gunicorn (Port 8001)**: WSGI server running multiple worker processes for synchronous HTTP requests
+- **Daphne (Port 8000)**: ASGI server handling asynchronous WebSocket connections and real-time features
+- **Redis**: Channel layer backend enabling real-time communication between server processes
+- **Systemd**: Manages Gunicorn and Daphne as independent system services with automatic restart
 
 ## 🎬 Demo Links
 
