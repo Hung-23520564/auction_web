@@ -17,13 +17,13 @@ from django.db.models.functions import Now
 from django.db.models.functions import Extract
 from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
+from rest_framework import generics
 
-class ItemList(APIView):
+class ItemListAPI(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
-    def get(self, request):
-        items = Item.objects.all()
-        serializer = ItemSerializer(items, many=True)
-        return Response(serializer.data)
+    serializer_class = ItemSerializer
+    # CHỈ LẤY ongoing
+    queryset = Item.objects.filter(status='ongoing')
 
 class ItemCreate(APIView):
     permission_classes = [permissions.IsAuthenticated]

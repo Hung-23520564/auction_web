@@ -573,11 +573,16 @@ def process_single_ended_auction(request):
                     # Kiểm tra để chắc chắn chưa có giao dịch nào được tạo
                     transaction_exists = Transaction.objects.filter(item_id=item, buyer_id=winner).exists()
                     if not transaction_exists:
+                        escrow_obj = Escrow.objects.filter(item=item, user=winner).first()
+                        deposit_amount = escrow_obj.amount if escrow_obj else Decimal('0')
+                        final_price = winning_bid.bid_amount - deposit_amount
+                        if final_price < 0:
+                            final_price = Decimal('0')
                         Transaction.objects.create(
                             item_id=item,
                             buyer_id=winner,
                             seller_id=item.seller,
-                            final_price=winning_bid.bid_amount,
+                            final_price= final_price,
                             status='pending'  # Hoặc 'PENDING_PAYMENT' tùy theo model Transaction của bạn
                         )
                         print(f"Created pending transaction for winner {winner.email} for item {item.name}")

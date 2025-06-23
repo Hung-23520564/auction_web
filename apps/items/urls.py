@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ItemList, ItemDetail, ItemCreate, ItemSearchAPI, ItemListAPI
+from .views import ItemDetail, ItemCreate, ItemSearchAPI, ItemListAPI
 from . import views
 from django.views.generic import TemplateView
 
