@@ -25,32 +25,36 @@ Team Members:
 
 ## 🎯 Description
 
-The Real-Time Auction Website is a comprehensive platform for fair and fast product bidding in real-time. Built with Django 5.1.6 and modern web technologies, it supports multiple users, secure transactions, WebSocket real-time updates, and AI-powered features, ensuring a safe and smooth auction experience.
+The Real-Time Auction Website is a comprehensive platform for fair and fast product bidding in real-time. Built with Django and modern web technologies, it supports multiple users, secure transactions, WebSocket real-time updates, and AI-powered features, ensuring a safe and smooth auction experience.
 
 ## 🛠 Technology Stack
 
 ### Backend
-- **Django 5.1.6** - Main web framework
+- **Django 5.x** - Main web framework
 - **Django Channels** - WebSocket support for real-time bidding
 - **Django REST Framework** - API development
-- **PostgreSQL** - Primary database
+- **PostgreSQL** - Primary relational database
 - **Redis** - Caching and WebSocket channel layer
-- **Celery** - Background task processing
+- **Celery** - Background task processing (nếu có)
 - **JWT Authentication** - Secure API authentication
 
 ### Frontend
 - **Bootstrap 5** - UI framework
-- **WebSocket** - Real-time communication
+- **JavaScript (Vanilla)** - Client-side logic
+- **WebSocket API** - Real-time communication
 
 ### Storage & Media
-- **Cloudinary** - Image storage and optimization
-- **WhiteNoise** - Static file serving
+- **Cloudinary** - Cloud-based image and video management
 
-### Deployment
-- **AWS EC2** - Production hosting
+### Deployment & Infrastructure
+- **AWS EC2** - Production application hosting
+- **AWS RDS for PostgreSQL** - Managed production database
+- **Cloudflare** - CDN, DNS, SSL, and Security Proxy
 - **Nginx** - Reverse proxy and static file serving
-- **Gunicorn/Uvicorn** - WSGI/ASGI server
-- **Vercel** - Alternative deployment option
+- **Gunicorn** - WSGI server for handling HTTP requests
+- **Daphne** - ASGI server for handling WebSocket connections
+- **Ubuntu** - Server operating system
+- **Systemd** - Service management on Linux
 
 ### Payment Integration
 - **VietQR** - Vietnamese QR payment system
@@ -74,39 +78,65 @@ The Real-Time Auction Website is a comprehensive platform for fair and fast prod
 - **Integrated Wallet** - VietQR payment integration
 - **Deposit System** - Required deposits for auction participation
 - **Transaction History** - Complete payment tracking
-- **Admin Approval** - Manual transaction verification
+- **Admin Approval** - Manual transaction verification for security
 
 ### Advanced Features
-- **AI Chatbot** - Real-time customer support
+- **AI Chatbot** - Real-time customer support (e.g., Kommunicate)
 - **Search & Filtering** - Full-text search with PostgreSQL
-- **Admin Dashboard** - Comprehensive auction management
+- **Admin Dashboard** - Comprehensive auction and user management
 - **Review System** - User rating and feedback
 - **Mobile Responsive** - Optimized for all devices
 
 ### Technical Features
-- **SEO Optimized** - Sitemap, robots.txt, meta tags
-- **Security Headers** - CORS, CSRF, XSS protection
+- **Production-Ready Stack** - Nginx + Gunicorn + Daphne for high performance
+- **SEO Optimized** - Sitemap, robots.txt, and meta tags
+- **Enhanced Security** - HTTPS, CSRF, XSS, and SQL Injection protection via Django & Cloudflare
 - **Performance Monitoring** - Built-in logging and tracking
 
 ## 🏗 Architecture
 
-### System Architecture
+### Production Deployment Architecture
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     Frontend    │    │      Django     │    │    Database     │
-│   (Bootstrap)   │◄──►│   (REST API)    │◄──►│  (PostgreSQL)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                      │
-         │              ┌─────────────────┐             │
-         │              │     Redis       │             │
-         └─────────────►│   (Cache &      │◄────────────┘
-                        │   WebSocket)    │
-                        └─────────────────┘
-                                 │
-                        ┌─────────────────┐
-                        │    Cloudinary   │
-                        │ (Image Storage) │
-                        └─────────────────┘
+              +----------------------------------+
+              |              Users               |
+              +-----------------+----------------+
+                                | (HTTPS)
+              +-----------------v----------------+
+              |           Cloudflare             |
+              | (DNS, CDN, SSL, DDoS Protection) |
+              +-----------------+----------------+
+                                | (HTTPS)
++-------------------------------v-------------------------------+
+|                   AWS EC2 Instance (Ubuntu)                   |
+|                                                               |
+|  +---------------------------+                                |
+|  |           Nginx           |                                |
+|  | (Reverse Proxy, Port 443) |                                |
+|  +-------------+-------------+                                |
+|                |                                              |
+|  +-------------+-------------+                                |
+|  |                           | (WebSocket /ws/**)             |
+|  |  (HTTP /)                 |                                |
+|  |                           |                                |
+|  +-------------v--v--+           +------------v-----------+   |
+|  |     Gunicorn      |           |          Daphne        |   |
+|  | (WSGI App Server) |           |  (ASGI App Server)     |   |
+|  +---------+---------+           +----------+-------------+   |
+|            |                                |                 |
+|            +----------------+---------------+                 |
+|                             |                                 |
+|                      +------v------+                          |
+|                      |   Django    |                          |
+|                      | Application |                          |
+|                      +--+-------+--+                          |
+|                         |       |                             |
++-------------------------+       +-----> AWS RDS (PostgreSQL)  |
+                                  |                             |
+                                  +-----> Redis (Channel Layer) | 
+                                  |                             |
+                                  +-----> Cloudinary (Media)    |
+                                                                |
++---------------------------------------------------------------+
 ```
 
 ### Application Structure
@@ -117,16 +147,15 @@ auction_web/
 │   ├── items/           # Auction item management
 │   ├── bidding/         # Real-time bidding system
 │   ├── payments/        # Transaction handling
-│   ├── wallet/          # User wallet & VietQR integration
-│   ├── reviews/         # User review system
-│   ├── chatbot/         # AI customer support
-│   ├── dashboard_admin/ # Admin management panel
-│   └── sim/             # Image upload simulation
+│   └── ...              # Other feature-specific apps
 ├── auction_web/
-│   ├── static/          # Static files (CSS, JS, images)
-│   ├── templates/       # HTML templates
+│   ├── static/          # Project-wide static files (CSS, JS)
+│   ├── templates/       # Base HTML templates
 │   └── settings.py      # Django configuration
+│   └── asgi.py          # ASGI entry-point for Daphne
+│   └── wsgi.py          # WSGI entry-point for Gunicorn
 └── requirements.txt     # Python dependencies
+└── manage.py            # Django's command-line utility
 ```
 
 ## 🚀 Installation
@@ -134,8 +163,8 @@ auction_web/
 ### Prerequisites
 - Python 3.10+
 - PostgreSQL 12+
-- Redis (optional, for production WebSocket)
-- Node.js (for frontend dependencies)
+- Redis
+- Git
 
 ### 1. Clone Repository
 ```bash
@@ -155,29 +184,31 @@ pip install -r requirements.txt
 ```
 
 ### 4. Environment Setup
-Create `.env` file in root directory:
+Create a `.env` file in the root directory by copying the example:
 ```bash
-cp .env.example .env  # Copy from template
+nano .env
 ```
+Then, fill in the required variables in the `.env` file.
 
 ### 5. Database Setup
+Ensure your PostgreSQL server is running and accessible.
 ```bash
+# Apply database migrations
 python manage.py migrate
+
+# Create a superuser for the admin panel
 python manage.py createsuperuser
 ```
 
-### 6. Collect Static Files
+### 6. Run Development Server
+Choose the appropriate command based on your needs:
 ```bash
-python manage.py collectstatic
-```
-
-### 7. Run Development Server
-```bash
-# For HTTP only
+# For standard HTTP development (no real-time features)
 python manage.py runserver
 
-# For WebSocket support (recommended)
-uvicorn auction_web.asgi:application --host 0.0.0.0 --port 8000 --reload
+# For development with real-time WebSocket features
+# This command runs the ASGI server directly to handle both HTTP and WebSockets
+daphne -p 8000 auction_web.asgi:app
 ```
 
 ## 🔧 Environment Variables
@@ -185,8 +216,9 @@ uvicorn auction_web.asgi:application --host 0.0.0.0 --port 8000 --reload
 ### Required Variables
 ```bash
 # Django
-SECRET_KEY=your-secret-key
+SECRET_KEY=your-super-secret-key
 DEBUG=True  # Set to False in production
+ALLOWED_HOSTS=127.0.0.1,localhost
 DATABASE_URL=postgresql://user:password@localhost:5432/auction_db
 
 # Cloudinary (Image Storage)
@@ -196,29 +228,14 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 # Email Configuration
 EMAIL_HOST_USER=your-email@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
+EMAIL_HOST_PASSWORD=your-google-app-password
 
 # Google OAuth (Optional)
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
-```
 
-### Production Variables
-```bash
-# AWS Deployment
-AWS_HOST=your-ec2-domain.com
-AWS_ALB_HOST=your-alb-domain.amazonaws.com
-
-# Redis (Production WebSocket)
-USE_REDIS_CHANNELS=True
-REDIS_URL=redis://your-redis-endpoint:6379
-
-# VietQR Payment
-VIETQR_CLIENT_ID=your-vietqr-client-id
-VIETQR_API_KEY=your-vietqr-api-key
-WEBSITE_BANK_ACCOUNT_NO=your-bank-account
-WEBSITE_BANK_ACCOUNT_NAME=your-account-name
-WEBSITE_BANK_ACQ_ID=your-bank-id
+# Redis (Required for production, optional for dev)
+REDIS_URL=redis://127.0.0.1:6379/1
 ```
 
 ## 📡 API Documentation
@@ -235,27 +252,30 @@ PUT  /api/users/profile/       # Update user profile
 ### Auction Endpoints
 ```
 GET  /api/items/               # List all auction items
-POST /api/items/create/        # Create new auction
 GET  /api/items/{id}/          # Get auction details
-PUT  /api/items/{id}/          # Update auction (owner only)
-
-POST /api/bidding/place-bid/   # Place a bid
-GET  /api/bidding/my-bids/     # Get user's bid history
-GET  /api/bidding/item/{id}/bids/  # Get item's bid history
-```
-
-### Wallet Endpoints
-```
-GET  /api/wallet/balance/      # Get wallet balance
-POST /api/wallet/deposit/      # Initiate deposit
-GET  /api/wallet/transactions/ # Get transaction history
 ```
 
 ### WebSocket Endpoints
 ```
-ws://localhost:8000/ws/bidding/{item_id}/  # Real-time bidding
-ws://localhost:8000/ws/home/               # Homepage updates
+ws://your-domain/ws/bidding/{item_id}/  # Real-time bidding for an item
+ws://your-domain/ws/home/               # General homepage updates
 ```
+
+*(For a full list of APIs, please refer to the project's Postman collection or Swagger documentation.)*
+
+## 🚀 Deployment
+
+This project is deployed on AWS using a high-performance stack managed by systemd.
+
+### Production Infrastructure
+- **AWS EC2 (Ubuntu)**: Hosts the Django application.
+- **AWS RDS for PostgreSQL**: Managed, scalable, and reliable database service.
+- **Cloudflare**: Acts as the primary entry point, providing CDN, DDoS protection, and SSL termination.
+- **Nginx**: Serves as a reverse proxy, directing HTTP traffic to Gunicorn, WebSocket traffic to Daphne, and serving static files directly for maximum speed.
+- **Gunicorn**: The WSGI server dedicated to handling synchronous HTTP requests.
+- **Daphne**: The ASGI server dedicated to handling asynchronous WebSocket connections.
+- **Redis**: Serves as the crucial channel layer backend, enabling communication between different server processes.
+- **Systemd**: Manages Gunicorn and Daphne as robust system services, ensuring they are always running.
 
 ## 🎬 Demo Links
 
@@ -263,41 +283,6 @@ ws://localhost:8000/ws/home/               # Homepage updates
   - <a href="https://vt.tiktok.com/ZSkvdnGwt/" target="_blank">Video 1</a>
   - <a href="https://vt.tiktok.com/ZSkvd3kX5/" target="_blank">Video 2</a>
   - <a href="https://vt.tiktok.com/ZSkvd3aM9/" target="_blank">Video 3</a>
-
-## 🔍 How It Works
-
-1. **User Registration** - Users create accounts with email verification
-2. **Auction Creation** - Sellers list items with starting prices and end times  
-3. **Deposit System** - Bidders must deposit the starting price to participate
-4. **Real-Time Bidding** - WebSocket enables live price updates and bid notifications
-5. **Escrow Management** - System holds deposits until auction completion
-6. **Payment Processing** - VietQR integration for secure transactions
-7. **Review System** - Users can rate each other after transactions
-
-## 📊 Key Metrics
-
-- **Real-time Performance** - WebSocket updates in real-time
-- **Security** - JWT authentication + CSRF protection
-- **Scalability** - Redis clustering support for high traffic
-- **Mobile Responsive** - 100% mobile compatibility
-- **SEO Optimized** - Full search engine optimization
-
-## 🛡 Security Features
-
-- **HTTPS Enforcement** - SSL/TLS encryption
-- **CSRF Protection** - Cross-site request forgery prevention
-- **XSS Protection** - Cross-site scripting prevention
-- **SQL Injection Prevention** - Django ORM protection
-- **Rate Limiting** - API request throttling
-- **Input Validation** - Comprehensive data validation
-
-## 📈 Performance Optimizations
-
-- **Database Indexing** - Optimized query performance
-- **Redis Caching** - Fast data retrieval
-- **Static File Compression** - Gzip compression
-- **Image Optimization** - Cloudinary automatic optimization
-- **Lazy Loading** - Progressive content loading
 
 ## 📄 License
 
