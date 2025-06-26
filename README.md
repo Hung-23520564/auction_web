@@ -1,10 +1,15 @@
 # Real-Time Auction Website
 
-**Course**: NT208.P23.ANTT
-**Instructor**: Trần Tuấn Dũng
-**Group**: 13
+**Course**: NT208.P23.ANTT <br>
+**Instructor**: Trần Tuấn Dũng <br>
+**Group**: 13 <br>
+**Team Members**:
+- 23520564: Nguyễn Đình Hưng
+- 23520648: Trần Quang Huy
+- 23520543: Trần Việt Hoàng
+- 23520247: Hoàng Quốc Đạt
 
-- **Live Website**: <a href="https://www.auctionhub.uk/" target="_blank">auctionhub.uk</a>
+**Live Website**: <a href="https://www.auctionhub.uk/" target="_blank">auctionhub.uk</a>
 
 ## 📋 Table of Contents
 - [Description](#description)
